@@ -144,15 +144,16 @@ export async function removeFamilyMember(familyId: string, memberId: string) {
   }
 
   try {
-    // 현재 사용자가 가족 owner인지 확인
-    const { data: family, error: familyError } = await supabase
-      .from('families')
-      .select('owner_id')
-      .eq('id', familyId)
+    // 현재 사용자가 이 가족의 멤버인지 확인
+    const { data: memberCheck, error: memberCheckError } = await supabase
+      .from('family_members')
+      .select('id')
+      .eq('family_id', familyId)
+      .eq('user_id', user.id)
       .single()
 
-    if (familyError || !family || family.owner_id !== user.id) {
-      throw new Error('권한이 없습니다')
+    if (memberCheckError || !memberCheck) {
+      throw new Error('이 가족에 접근할 수 없습니다')
     }
 
     // 제거할 멤버 조회
@@ -206,15 +207,16 @@ export async function cancelFamilyInvitation(familyId: string, email: string) {
   }
 
   try {
-    // 현재 사용자가 가족 owner인지 확인
-    const { data: family, error: familyError } = await supabase
-      .from('families')
-      .select('owner_id')
-      .eq('id', familyId)
+    // 현재 사용자가 이 가족의 멤버인지 확인
+    const { data: memberCheck, error: memberCheckError } = await supabase
+      .from('family_members')
+      .select('id')
+      .eq('family_id', familyId)
+      .eq('user_id', user.id)
       .single()
 
-    if (familyError || !family || family.owner_id !== user.id) {
-      throw new Error('권한이 없습니다')
+    if (memberCheckError || !memberCheck) {
+      throw new Error('이 가족에 접근할 수 없습니다')
     }
 
     // pending 초대 삭제 (user_id IS NULL)
@@ -281,15 +283,16 @@ export async function addExistingMemberToFamily(
   }
 
   try {
-    // 현재 사용자가 owner인지 확인
-    const { data: family, error: familyError } = await supabase
-      .from('families')
-      .select('owner_id')
-      .eq('id', familyId)
+    // 현재 사용자가 이 가족의 멤버인지 확인
+    const { data: memberCheck, error: memberCheckError } = await supabase
+      .from('family_members')
+      .select('id')
+      .eq('family_id', familyId)
+      .eq('user_id', user.id)
       .single()
 
-    if (familyError || !family || family.owner_id !== user.id) {
-      throw new Error('권한이 없습니다')
+    if (memberCheckError || !memberCheck) {
+      throw new Error('이 가족에 접근할 수 없습니다')
     }
 
     // 해당 이메일의 user_id 찾기
@@ -352,15 +355,16 @@ export async function updateFamily(input: {
   }
 
   try {
-    // 현재 사용자가 가족 소유자인지 확인
-    const { data: family, error: checkError } = await supabase
-      .from('families')
-      .select('owner_id')
-      .eq('id', input.familyId)
+    // 현재 사용자가 이 가족의 멤버인지 확인
+    const { data: memberCheck, error: memberCheckError } = await supabase
+      .from('family_members')
+      .select('id')
+      .eq('family_id', input.familyId)
+      .eq('user_id', user.id)
       .single()
 
-    if (checkError || !family || family.owner_id !== user.id) {
-      throw new Error('권한이 없습니다')
+    if (memberCheckError || !memberCheck) {
+      throw new Error('이 가족에 접근할 수 없습니다')
     }
 
     // 가족 정보 업데이트

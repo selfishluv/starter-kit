@@ -37,6 +37,7 @@ interface FamilyMember {
 
 export default function SettingsPage() {
   const [loading, setLoading] = useState(false)
+  const [userLoading, setUserLoading] = useState(true)
   const [familyLoading, setFamilyLoading] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
   const [familiesLoading, setFamiliesLoading] = useState(true)
@@ -44,6 +45,11 @@ export default function SettingsPage() {
   const [family, setFamily] = useState<Family | null>(null)
   const [members, setMembers] = useState<FamilyMember[]>([])
   const [isCreatingFamily, setIsCreatingFamily] = useState(false)
+  const [currentUser, setCurrentUser] = useState<{
+    email: string
+    created_at: string
+    last_sign_in_at?: string
+  } | null>(null)
   const supabase = createClient()
 
   // 초대 폼
@@ -70,15 +76,28 @@ export default function SettingsPage() {
     },
   })
 
-  // 가족 목록 및 정보 로드
+  // 회원 정보 및 가족 정보 로드
   useEffect(() => {
     async function load() {
       try {
+        // 현재 로그인한 사용자 조회
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          setCurrentUser({
+            email: user.email ?? '',
+            created_at: user.created_at,
+            last_sign_in_at: user.last_sign_in_at,
+          })
+        }
+        setUserLoading(false)
+
+        // 가족 정보 로드
         await loadFamilies()
         await loadFamily()
       } catch (err) {
-        console.error('가족 정보 로드 오류:', err)
-        toast.error('가족 정보를 불러올 수 없습니다.')
+        console.error('정보 로드 오류:', err)
+        toast.error('정보를 불러올 수 없습니다.')
+        setUserLoading(false)
       } finally {
         setFamilyLoading(false)
       }
@@ -261,6 +280,59 @@ export default function SettingsPage() {
   return (
     <div className="mx-auto max-w-lg px-4 py-6 space-y-8">
       <h1 className="text-xl font-bold text-gray-900">설정</h1>
+
+      {/* 내 계정 */}
+      <section className="rounded-xl bg-white border border-gray-100 p-5 shadow-sm space-y-4">
+        <h2 className="font-semibold text-gray-900">내 계정</h2>
+
+        {userLoading ? (
+          <div className="space-y-3">
+            <div>
+              <p className="text-gray-500 text-xs mb-1">이메일</p>
+              <Skeleton className="h-6 w-full" />
+            </div>
+            <div>
+              <p className="text-gray-500 text-xs mb-1">소속 가족</p>
+              <Skeleton className="h-6 w-full" />
+            </div>
+            <div>
+              <p className="text-gray-500 text-xs mb-1">가입일</p>
+              <Skeleton className="h-6 w-full" />
+            </div>
+            <div>
+              <p className="text-gray-500 text-xs mb-1">마지막 로그인</p>
+              <Skeleton className="h-6 w-full" />
+            </div>
+          </div>
+        ) : currentUser ? (
+          <div className="space-y-3 text-sm">
+            <div>
+              <p className="text-gray-500 text-xs mb-1">이메일</p>
+              <p className="text-gray-700 font-medium">{currentUser.email}</p>
+            </div>
+            <div>
+              <p className="text-gray-500 text-xs mb-1">소속 가족</p>
+              <p className="text-gray-700">{family?.name || '가족 없음'}</p>
+            </div>
+            <div>
+              <p className="text-gray-500 text-xs mb-1">가입일</p>
+              <p className="text-gray-700">
+                {new Date(currentUser.created_at).toLocaleDateString('ko-KR')}
+              </p>
+            </div>
+            <div>
+              <p className="text-gray-500 text-xs mb-1">마지막 로그인</p>
+              <p className="text-gray-700">
+                {currentUser.last_sign_in_at
+                  ? new Date(currentUser.last_sign_in_at).toLocaleString('ko-KR')
+                  : '정보 없음'}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-gray-500 text-center py-4">계정 정보를 불러올 수 없습니다</p>
+        )}
+      </section>
 
       {/* 가족 선택 */}
       <section className="rounded-xl bg-white border border-gray-100 p-5 shadow-sm space-y-4">

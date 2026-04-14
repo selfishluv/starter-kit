@@ -79,6 +79,7 @@ export async function getUserFamilies() {
 
 /**
  * 가족 상세 정보 조회 (멤버 포함)
+ * 권한 검증: 사용자가 해당 가족의 멤버인지 확인
  */
 export async function getFamilyWithMembers(familyId: string) {
   const supabase = await createClient()
@@ -90,6 +91,18 @@ export async function getFamilyWithMembers(familyId: string) {
 
   if (authError || !user) {
     throw new Error('인증 필요')
+  }
+
+  // 사용자가 해당 family의 멤버인지 확인 (권한 검증)
+  const { data: member, error: memberCheckError } = await supabase
+    .from('family_members')
+    .select('id')
+    .eq('family_id', familyId)
+    .eq('user_id', user.id)
+    .single()
+
+  if (memberCheckError || !member) {
+    throw new Error('이 가족에 접근할 수 없습니다')
   }
 
   // 가족 정보 조회
@@ -119,4 +132,3 @@ export async function getFamilyWithMembers(familyId: string) {
     members: members || [],
   }
 }
-

@@ -24,6 +24,19 @@ export async function getUserFamilyId(): Promise<string> {
     .single()
 
   if (families && families.id) {
+    // 기존 가족이 있으면 family_members에 upsert (없을 경우만 삽입)
+    const { error: memberError } = await supabase
+      .from('family_members')
+      .upsert(
+        [{ family_id: families.id, user_id: user.id, email: user.email, role: 'owner' }],
+        { onConflict: 'family_id,user_id', ignoreDuplicates: true }
+      )
+
+    if (memberError) {
+      console.error('기존 가족의 멤버 추가 오류:', memberError)
+      // 멤버 추가 실패해도 family ID는 반환
+    }
+
     return families.id
   }
 

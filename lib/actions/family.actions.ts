@@ -34,6 +34,23 @@ export async function createFamily(input: { name?: string }) {
       throw new Error('가족 생성에 실패했습니다')
     }
 
+    // ✅ NEW: family_members 테이블에 owner를 추가
+    const { error: memberError } = await supabase
+      .from('family_members')
+      .insert([
+        {
+          family_id: data.id,
+          user_id: user.id,
+          email: user.email,
+          role: 'owner',
+        },
+      ])
+
+    if (memberError) {
+      console.error('가족 멤버 추가 오류:', memberError)
+      // 멤버 추가 실패해도 family는 생성됨, 경고만 하고 계속
+    }
+
     return data
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : '가족 생성에 실패했습니다'
@@ -63,11 +80,15 @@ export async function inviteFamilyMember(input: {
   }
 
   try {
+    // ✅ NEW: Magic Link URL에 familyId와 inviteEmail 파라미터 추가
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    const emailRedirectTo = `${baseUrl}/auth/callback?next=/settings&familyId=${input.familyId}&inviteEmail=${encodeURIComponent(input.email)}`
+
     // Magic Link로 로그인 링크 발송
     const { error } = await supabase.auth.signInWithOtp({
       email: input.email,
       options: {
-        emailRedirectTo: input.redirectUrl || `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/callback?next=/settings`,
+        emailRedirectTo,
         shouldCreateUser: true,
       },
     })

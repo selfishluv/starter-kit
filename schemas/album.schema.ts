@@ -28,3 +28,22 @@ export const inviteMemberSchema = z.object({
 })
 
 export type InviteMemberInput = z.infer<typeof inviteMemberSchema>
+
+/**
+ * 가족 정보 수정 스키마
+ */
+export const familyUpdateSchema = z.object({
+  name: z
+    .string()
+    .min(1, '가족명을 입력해주세요.')
+    .max(100)
+    .optional()
+    .or(z.literal('')),
+  description: z
+    .string()
+    .max(500)
+    .optional()
+    .or(z.literal('')),
+})
+
+export type FamilyUpdateInput = z.infer<typeof familyUpdateSchema>

@@ -1,4 +1,15 @@
 /**
+ * 가족 데이터베이스 모델
+ */
+export interface Family {
+  id: string
+  owner_id: string
+  name?: string
+  created_at: string
+  updated_at?: string
+}
+
+/**
  * 앨범 데이터베이스 모델
  */
 export interface Album {

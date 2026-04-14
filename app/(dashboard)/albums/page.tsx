@@ -1,16 +1,33 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAlbums } from '@/hooks/useAlbums'
 import { AlbumCard } from '@/components/album/AlbumCard'
 import { CreateAlbumDialog } from '@/components/album/CreateAlbumDialog'
 import { Skeleton } from '@/components/ui/skeleton'
 
-const PLACEHOLDER_FAMILY_ID = 'family-placeholder'
-
 export default function AlbumsPage() {
   const [createOpen, setCreateOpen] = useState(false)
-  const { data: albums, isPending } = useAlbums(PLACEHOLDER_FAMILY_ID)
+  const [familyId, setFamilyId] = useState<string>('')
+  const [familyLoading, setFamilyLoading] = useState(true)
+  const { data: albums, isPending } = useAlbums(familyId)
+
+  // 서버에서 familyId 가져오기
+  useEffect(() => {
+    async function getFamilyId() {
+      try {
+        const res = await fetch('/api/family/me')
+        if (!res.ok) throw new Error('가족 정보 조회 실패')
+        const data = await res.json()
+        setFamilyId(data.familyId)
+      } catch (err) {
+        console.error('familyId 조회 오류:', err)
+      } finally {
+        setFamilyLoading(false)
+      }
+    }
+    getFamilyId()
+  }, [])
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 space-y-4">
@@ -26,7 +43,7 @@ export default function AlbumsPage() {
       </div>
 
       {/* 앨범 목록 */}
-      {isPending ? (
+      {familyLoading || isPending ? (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="space-y-2">
@@ -57,11 +74,13 @@ export default function AlbumsPage() {
       )}
 
       {/* 앨범 생성 모달 */}
-      <CreateAlbumDialog
-        open={createOpen}
-        onOpenChange={setCreateOpen}
-        familyId={PLACEHOLDER_FAMILY_ID}
-      />
+      {familyId && (
+        <CreateAlbumDialog
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+          familyId={familyId}
+        />
+      )}
     </div>
   )
 }

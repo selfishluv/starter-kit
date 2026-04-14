@@ -41,6 +41,23 @@ export async function getUserFamilyId(): Promise<string> {
     }
 
     if (newFamily && newFamily.id) {
+      // ✅ NEW: family_members 테이블에 owner를 추가
+      const { error: memberError } = await supabase
+        .from('family_members')
+        .insert([
+          {
+            family_id: newFamily.id,
+            user_id: user.id,
+            email: user.email,
+            role: 'owner',
+          },
+        ])
+
+      if (memberError) {
+        console.error('가족 멤버 추가 오류:', memberError)
+        // 멤버 추가 실패해도 family는 생성됨, 경고만 하고 계속
+      }
+
       return newFamily.id
     }
   }

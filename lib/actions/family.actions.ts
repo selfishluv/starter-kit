@@ -111,6 +111,7 @@ export async function inviteFamilyMember(input: {
 export async function updateFamily(input: {
   familyId: string
   name?: string
+  description?: string
 }) {
   const supabase = await createClient()
 

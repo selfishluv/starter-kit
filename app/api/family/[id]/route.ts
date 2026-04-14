@@ -3,10 +3,11 @@ import { getFamilyWithMembers } from '@/lib/queries/families'
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { family, members } = await getFamilyWithMembers(params.id)
+    const { id } = await params
+    const { family, members } = await getFamilyWithMembers(id)
     return NextResponse.json({ family, members })
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : '조회 실패'

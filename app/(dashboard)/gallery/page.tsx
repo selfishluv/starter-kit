@@ -17,6 +17,7 @@ export default function GalleryPage() {
   const [uploadOpen, setUploadOpen] = useState(false)
   const [selectedAlbumId, setSelectedAlbumId] = useState<string>('')
   const [familyId, setFamilyId] = useState<string>('')
+  const [familyLoading, setFamilyLoading] = useState(true)
   const { data: albums, isPending: albumsLoading } = useAlbums(familyId)
 
   // 서버에서 familyId 가져오기

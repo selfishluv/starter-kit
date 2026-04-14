@@ -73,6 +73,7 @@ export function PhotoUploadDropzone({ albumId, onSuccess }: PhotoUploadDropzoneP
 
         if (storageError) throw storageError
 
+        // 스토리지 업로드 완료, 진행율 70% 업데이트
         setFiles((prev) =>
           prev.map((f) =>
             f.file === uploadFile.file ? { ...f, progress: 70 } : f
@@ -95,7 +96,9 @@ export function PhotoUploadDropzone({ albumId, onSuccess }: PhotoUploadDropzoneP
         )
         successCount++
       } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : '업로드 실패'
         console.error('업로드 오류:', err)
+        toast.error(`업로드 실패: ${errorMessage}`)
         setFiles((prev) =>
           prev.map((f) =>
             f.file === uploadFile.file ? { ...f, status: 'error' } : f

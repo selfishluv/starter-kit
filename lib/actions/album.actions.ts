@@ -22,6 +22,18 @@ export async function createAlbum(input: {
     throw new Error('인증 필요')
   }
 
+  // 권한 검증: 사용자가 해당 family의 멤버인지 확인
+  const { data: member, error: memberError } = await supabase
+    .from('family_members')
+    .select('id')
+    .eq('family_id', input.familyId)
+    .eq('user_id', user.id)
+    .single()
+
+  if (memberError || !member) {
+    throw new Error('이 가족에 접근할 수 없습니다')
+  }
+
   // 입력값 검증
   const validatedData = albumCreateSchema.parse({
     name: input.name,
@@ -68,6 +80,29 @@ export async function updateAlbum(
     throw new Error('인증 필요')
   }
 
+  // 앨범 정보 조회 및 권한 검증
+  const { data: album, error: albumError } = await supabase
+    .from('albums')
+    .select('family_id')
+    .eq('id', albumId)
+    .single()
+
+  if (albumError || !album) {
+    throw new Error('앨범을 찾을 수 없습니다')
+  }
+
+  // family 멤버십 확인
+  const { data: member, error: memberError } = await supabase
+    .from('family_members')
+    .select('id')
+    .eq('family_id', album.family_id)
+    .eq('user_id', user.id)
+    .single()
+
+  if (memberError || !member) {
+    throw new Error('이 앨범을 수정할 수 없습니다')
+  }
+
   // 입력값 검증
   const validatedData = albumUpdateSchema.parse(input)
 
@@ -101,6 +136,29 @@ export async function deleteAlbum(albumId: string) {
   } = await supabase.auth.getUser()
   if (authError || !user) {
     throw new Error('인증 필요')
+  }
+
+  // 앨범 정보 조회 및 권한 검증
+  const { data: album, error: albumError } = await supabase
+    .from('albums')
+    .select('family_id')
+    .eq('id', albumId)
+    .single()
+
+  if (albumError || !album) {
+    throw new Error('앨범을 찾을 수 없습니다')
+  }
+
+  // family 멤버십 확인
+  const { data: member, error: memberError } = await supabase
+    .from('family_members')
+    .select('id')
+    .eq('family_id', album.family_id)
+    .eq('user_id', user.id)
+    .single()
+
+  if (memberError || !member) {
+    throw new Error('이 앨범을 삭제할 수 없습니다')
   }
 
   // 앨범 내 모든 사진 조회

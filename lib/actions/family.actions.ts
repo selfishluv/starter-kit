@@ -95,7 +95,9 @@ export async function inviteFamilyMember(input: {
 
     if (error) {
       console.error('Magic Link 발송 오류:', error)
-      throw new Error('이메일 발송에 실패했습니다')
+      // 더 상세한 오류 메시지 제공
+      const errorDetail = error.message || '알 수 없는 오류'
+      throw new Error(`이메일 발송에 실패했습니다: ${errorDetail}`)
     }
 
     // 초대 기록: family_members 테이블에 pending 상태로 추가
@@ -258,6 +260,76 @@ export async function assignUserToFamily(familyId: string, email: string) {
     familyId,
     email,
   })
+}
+
+/**
+ * 기존 회원을 가족에 추가 (이메일 발송 없음)
+ */
+export async function addExistingMemberToFamily(
+  familyId: string,
+  email: string
+) {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    throw new Error('인증 필요')
+  }
+
+  try {
+    // 현재 사용자가 owner인지 확인
+    const { data: family, error: familyError } = await supabase
+      .from('families')
+      .select('owner_id')
+      .eq('id', familyId)
+      .single()
+
+    if (familyError || !family || family.owner_id !== user.id) {
+      throw new Error('권한이 없습니다')
+    }
+
+    // 해당 이메일의 user_id 찾기
+    const { data: member } = await supabase
+      .from('family_members')
+      .select('user_id')
+      .eq('email', email)
+      .not('user_id', 'is', null)
+      .limit(1)
+      .single()
+
+    if (!member?.user_id) {
+      throw new Error('등록된 회원을 찾을 수 없습니다')
+    }
+
+    // 가족에 추가
+    const { error: upsertError } = await supabase
+      .from('family_members')
+      .upsert(
+        [
+          {
+            family_id: familyId,
+            user_id: member.user_id,
+            email,
+            role: 'member',
+          },
+        ],
+        { onConflict: 'family_id,user_id', ignoreDuplicates: true }
+      )
+
+    if (upsertError && upsertError.code !== '23505') {
+      throw upsertError
+    }
+
+    return { success: true, email }
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : '회원 추가에 실패했습니다'
+    console.error('회원 추가 오류:', err)
+    throw new Error(errorMessage)
+  }
 }
 
 /**

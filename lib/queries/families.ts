@@ -162,3 +162,41 @@ export async function getFamilyWithMembers(familyId: string) {
     members: members || [],
   }
 }
+
+/**
+ * 기존 회원 검색 (user_id가 있는 회원만)
+ * 이메일로 검색하여 이미 가입한 사용자를 찾음
+ */
+export async function searchExistingMembers(email: string) {
+  const supabase = await createClient()
+
+  try {
+    const { data, error } = await supabase
+      .from('family_members')
+      .select('email, user_id, invited_at')
+      .eq('email', email)
+      .not('user_id', 'is', null)
+      .limit(5)
+
+    if (error) {
+      console.error('회원 검색 오류:', error)
+      return []
+    }
+
+    if (!data) return []
+
+    // 중복 제거 (같은 user_id는 여러 가족에 속할 수 있음)
+    const uniqueMembers = Array.from(
+      new Map(data.map((m) => [m.user_id, m])).values()
+    )
+
+    return uniqueMembers.map((m) => ({
+      email: m.email,
+      user_id: m.user_id,
+      created_at: m.invited_at,
+    }))
+  } catch (err) {
+    console.error('회원 검색 중 오류:', err)
+    return []
+  }
+}

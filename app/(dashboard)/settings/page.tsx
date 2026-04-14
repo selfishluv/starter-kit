@@ -17,6 +17,7 @@ import {
 import { inviteMemberSchema, familyUpdateSchema, type InviteMemberInput, type FamilyUpdateInput } from '@/schemas/album.schema'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { AddExistingMemberModal } from '@/components/modals/AddExistingMemberModal'
 
 interface Family {
   id: string
@@ -50,6 +51,7 @@ export default function SettingsPage() {
     created_at: string
     last_sign_in_at?: string
   } | null>(null)
+  const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false)
   const supabase = createClient()
 
   // 초대 폼
@@ -608,33 +610,54 @@ export default function SettingsPage() {
         </form>
       </section>
 
-      {/* 추가 초대 */}
+      {/* 멤버 추가 옵션 */}
       <section className="rounded-xl bg-white border border-gray-100 p-5 shadow-sm space-y-4">
+        <h2 className="font-semibold text-gray-900">멤버 추가</h2>
+
+        {/* 기존 회원 추가 */}
         <div>
-          <h2 className="font-semibold text-gray-900">추가 초대</h2>
-          <p className="text-sm text-gray-500 mt-1">
-            다른 이메일로도 가족 멤버를 초대할 수 있습니다.
-          </p>
+          <p className="text-sm text-gray-600 mb-3">이미 가입한 회원을 가족에 추가합니다.</p>
+          <Button
+            onClick={() => setIsAddMemberModalOpen(true)}
+            className="w-full bg-green-500 hover:bg-green-600 text-white"
+          >
+            기존 회원 추가
+          </Button>
         </div>
 
-        <form onSubmit={handleSubmitAdmin(onAssignUser)} className="flex gap-2">
-          <div className="flex-1">
-            <input
-              {...registerAdmin('email')}
-              type="email"
-              placeholder="another@example.com"
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm placeholder-gray-400 focus:border-rose-300 focus:outline-none focus:ring-2 focus:ring-rose-100"
-            />
-          </div>
-          <Button
-            type="submit"
-            disabled={isAdminSubmitting}
-            className="bg-blue-500 hover:bg-blue-600 text-white shrink-0"
-          >
-            초대
-          </Button>
-        </form>
+        {/* 구분선 */}
+        <div className="border-t border-gray-200" />
+
+        {/* 이메일 초대 */}
+        <div>
+          <p className="text-sm text-gray-600 mb-3">새 회원을 이메일로 초대합니다.</p>
+          <form onSubmit={handleSubmitAdmin(onAssignUser)} className="flex gap-2">
+            <div className="flex-1">
+              <input
+                {...registerAdmin('email')}
+                type="email"
+                placeholder="another@example.com"
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm placeholder-gray-400 focus:border-rose-300 focus:outline-none focus:ring-2 focus:ring-rose-100"
+              />
+            </div>
+            <Button
+              type="submit"
+              disabled={isAdminSubmitting}
+              className="bg-blue-500 hover:bg-blue-600 text-white shrink-0"
+            >
+              초대
+            </Button>
+          </form>
+        </div>
       </section>
+
+      {/* 모달 */}
+      <AddExistingMemberModal
+        isOpen={isAddMemberModalOpen}
+        familyId={family?.id || ''}
+        onClose={() => setIsAddMemberModalOpen(false)}
+        onSuccess={loadFamily}
+      />
 
       {/* 계정 */}
       <section className="rounded-xl bg-white border border-gray-100 p-5 shadow-sm space-y-4">

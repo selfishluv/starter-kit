@@ -20,14 +20,17 @@ export function getThumbnailUrl(
   const width = sizeMap[size]
   const height = sizeMap[size]
 
-  const { data } = supabase.storage.from('photos').getPublicUrl(path, {
+  // Supabase 변환 옵션
+  const transformOptions = {
     transform: {
       width,
       height,
-      resize: 'cover', // 비율 유지하며 중앙 크롭
+      resize: 'cover' as const, // 비율 유지하며 중앙 크롭
       quality: 80,
     },
-  } as any)
+  }
+
+  const { data } = supabase.storage.from('photos').getPublicUrl(path, transformOptions)
 
   return data.publicUrl
 }

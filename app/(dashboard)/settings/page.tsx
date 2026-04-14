@@ -99,8 +99,9 @@ export default function SettingsPage() {
       reset()
       // 멤버 목록 새로고침
       loadFamily()
-    } catch (err: any) {
-      toast.error(err.message ?? '초대 발송에 실패했습니다.')
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : '초대 발송에 실패했습니다.'
+      toast.error(errorMessage)
     }
   }
 
@@ -138,8 +139,9 @@ export default function SettingsPage() {
       toast.success('가족 정보가 저장되었습니다.')
       setIsEditing(false)
       await loadFamily()
-    } catch (err: any) {
-      toast.error(err.message ?? '가족 정보 저장에 실패했습니다.')
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : '가족 정보 저장에 실패했습니다.'
+      toast.error(errorMessage)
     }
   }
 
@@ -164,8 +166,9 @@ export default function SettingsPage() {
       await loadFamilies()
       // 새로 생성된 가족으로 이동
       setFamily(newFamily as Family)
-    } catch (err: any) {
-      toast.error(err.message ?? '가족 생성에 실패했습니다.')
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : '가족 생성에 실패했습니다.'
+      toast.error(errorMessage)
     } finally {
       setIsCreatingFamily(false)
     }

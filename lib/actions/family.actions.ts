@@ -35,9 +35,10 @@ export async function createFamily(input: { name?: string }) {
     }
 
     return data
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : '가족 생성에 실패했습니다'
     console.error('가족 생성 오류:', err)
-    throw new Error(err.message ?? '가족 생성에 실패했습니다')
+    throw new Error(errorMessage)
   }
 }
 
@@ -97,9 +98,10 @@ export async function inviteFamilyMember(input: {
     }
 
     return { success: true, email: input.email }
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : '초대 발송에 실패했습니다'
     console.error('초대 발송 오류:', err)
-    throw new Error(err.message ?? '초대 발송에 실패했습니다')
+    throw new Error(errorMessage)
   }
 }
 
@@ -151,8 +153,9 @@ export async function updateFamily(input: {
     }
 
     return data
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : '가족 정보 수정에 실패했습니다'
     console.error('가족 정보 수정 오류:', err)
-    throw new Error(err.message ?? '가족 정보 수정에 실패했습니다')
+    throw new Error(errorMessage)
   }
 }

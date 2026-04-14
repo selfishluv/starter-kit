@@ -54,8 +54,9 @@ export function LoginForm() {
       if (error) throw error
       // 로그인 성공 시 대시보드로 이동
       window.location.href = '/'
-    } catch (err: any) {
-      toast.error(err.message ?? '오류가 발생했습니다.')
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : '오류가 발생했습니다.'
+      toast.error(errorMessage)
     } finally {
       setLoading(false)
     }

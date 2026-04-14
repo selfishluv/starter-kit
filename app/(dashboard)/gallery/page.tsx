@@ -11,14 +11,12 @@ import { useGalleryStore } from '@/hooks/useGalleryStore'
 import { useAlbums } from '@/hooks/useAlbums'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useRouter } from 'next/navigation'
 
 export default function GalleryPage() {
   const { viewMode } = useGalleryStore()
   const [uploadOpen, setUploadOpen] = useState(false)
   const [selectedAlbumId, setSelectedAlbumId] = useState<string>('')
   const [familyId, setFamilyId] = useState<string>('')
-  const [familyLoading, setFamilyLoading] = useState(true)
   const { data: albums, isPending: albumsLoading } = useAlbums(familyId)
 
   // 서버에서 familyId 가져오기

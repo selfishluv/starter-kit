@@ -5,10 +5,11 @@ export async function GET() {
   try {
     const families = await getUserFamilies()
     return NextResponse.json({ families })
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : '조회 실패'
     console.error('가족 목록 조회 오류:', error)
     return NextResponse.json(
-      { error: error.message ?? '조회 실패' },
+      { error: errorMessage },
       { status: 400 }
     )
   }

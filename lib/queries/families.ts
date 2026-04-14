@@ -2,9 +2,9 @@ import { createClient } from '@/lib/supabase/server'
 
 /**
  * 현재 사용자의 가족 ID 조회
- * 없으면 새로 생성
+ * 소유한 가족이 없으면 null 반환 (자동 생성하지 않음)
  */
-export async function getUserFamilyId(): Promise<string> {
+export async function getUserFamilyId(): Promise<string | null> {
   const supabase = await createClient()
 
   const {
@@ -40,39 +40,9 @@ export async function getUserFamilyId(): Promise<string> {
     return families.id
   }
 
-  // 가족이 없으면 생성
+  // ✅ 변경: 가족이 없으면 null 반환 (자동 생성하지 않음)
   if (queryError && queryError.code === 'PGRST116') {
-    const { data: newFamily, error: createError } = await supabase
-      .from('families')
-      .insert([{ owner_id: user.id }])
-      .select('id')
-      .single()
-
-    if (createError) {
-      console.error('가족 생성 오류:', createError)
-      throw new Error('가족 생성에 실패했습니다')
-    }
-
-    if (newFamily && newFamily.id) {
-      // ✅ NEW: family_members 테이블에 owner를 추가
-      const { error: memberError } = await supabase
-        .from('family_members')
-        .insert([
-          {
-            family_id: newFamily.id,
-            user_id: user.id,
-            email: user.email,
-            role: 'owner',
-          },
-        ])
-
-      if (memberError) {
-        console.error('가족 멤버 추가 오류:', memberError)
-        // 멤버 추가 실패해도 family는 생성됨, 경고만 하고 계속
-      }
-
-      return newFamily.id
-    }
+    return null
   }
 
   throw new Error('가족 ID를 찾을 수 없습니다')

@@ -211,6 +211,13 @@ export default function SettingsPage() {
       if (!familyRes.ok) throw new Error('가족 정보 조회 실패')
       const familyData = await familyRes.json()
 
+      // ✅ familyId가 null이면 가족이 없음
+      if (!familyData.familyId) {
+        setFamily(null)
+        setMembers([])
+        return
+      }
+
       // 가족 상세 정보 조회
       const detailRes = await fetch(`/api/family/${familyData.familyId}`)
       if (!detailRes.ok) throw new Error('가족 상세 정보 조회 실패')

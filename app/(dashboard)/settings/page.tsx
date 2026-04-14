@@ -159,13 +159,9 @@ export default function SettingsPage() {
     if (!family) return
 
     try {
-      const result = await assignUserToFamily(family.id, email)
-      if (result.method === 'direct') {
-        toast.success(`${email} 사용자가 가족에 추가되었습니다.`)
-      } else {
-        toast.success(`${email}로 초대 링크를 보냈습니다.`)
-      }
-      reset()
+      await assignUserToFamily(family.id, email)
+      toast.success(`${email}로 초대 링크를 보냈습니다.`)
+      resetAdmin()
       await loadFamily()
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : '사용자 추가에 실패했습니다.'
@@ -540,12 +536,12 @@ export default function SettingsPage() {
         </form>
       </section>
 
-      {/* 어드민: 회원 가족 직접 할당 */}
+      {/* 추가 초대 */}
       <section className="rounded-xl bg-white border border-gray-100 p-5 shadow-sm space-y-4">
         <div>
-          <h2 className="font-semibold text-gray-900">회원 가족 배정</h2>
+          <h2 className="font-semibold text-gray-900">추가 초대</h2>
           <p className="text-sm text-gray-500 mt-1">
-            이미 가입한 회원을 이 가족에 직접 추가합니다.
+            다른 이메일로도 가족 멤버를 초대할 수 있습니다.
           </p>
         </div>
 
@@ -554,7 +550,7 @@ export default function SettingsPage() {
             <input
               {...registerAdmin('email')}
               type="email"
-              placeholder="member@example.com"
+              placeholder="another@example.com"
               className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm placeholder-gray-400 focus:border-rose-300 focus:outline-none focus:ring-2 focus:ring-rose-100"
             />
           </div>
@@ -563,7 +559,7 @@ export default function SettingsPage() {
             disabled={isAdminSubmitting}
             className="bg-blue-500 hover:bg-blue-600 text-white shrink-0"
           >
-            추가
+            초대
           </Button>
         </form>
       </section>

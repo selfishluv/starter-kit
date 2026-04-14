@@ -247,75 +247,17 @@ export async function resendFamilyInvitation(familyId: string, email: string) {
 
 /**
  * 어드민: 회원에게 가족 직접 할당
- * 이미 가입된 사용자면 Magic Link 없이 바로 추가
- * 미가입 사용자면 Magic Link 초대 방식 사용
+ * 모든 사용자에게 Magic Link 초대 방식 사용
+ * (RLS 제약으로 인해 auth.users 직접 조회 불가)
  */
 export async function assignUserToFamily(familyId: string, email: string) {
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-
-  if (authError || !user) {
-    throw new Error('인증 필요')
-  }
-
-  try {
-    // 현재 사용자가 가족 owner인지 확인
-    const { data: family, error: familyError } = await supabase
-      .from('families')
-      .select('owner_id')
-      .eq('id', familyId)
-      .single()
-
-    if (familyError || !family || family.owner_id !== user.id) {
-      throw new Error('권한이 없습니다')
-    }
-
-    // 해당 이메일의 user_id 찾기 (어디 가족이든 상관없음)
-    const { data: existingMember } = await supabase
-      .from('family_members')
-      .select('user_id')
-      .eq('email', email)
-      .not('user_id', 'is', null)
-      .limit(1)
-      .single()
-
-    if (existingMember?.user_id) {
-      // 이미 가입된 사용자: upsert로 바로 추가
-      const { error: upsertError } = await supabase
-        .from('family_members')
-        .upsert(
-          [
-            {
-              family_id: familyId,
-              user_id: existingMember.user_id,
-              email,
-              role: 'member',
-            },
-          ],
-          { onConflict: 'family_id,user_id', ignoreDuplicates: true }
-        )
-
-      if (upsertError && upsertError.code !== '23505') {
-        throw upsertError
-      }
-
-      return { success: true, email, method: 'direct' }
-    } else {
-      // 미가입 사용자: Magic Link 초대 방식
-      return inviteFamilyMember({
-        familyId,
-        email,
-      })
-    }
-  } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : '가족 배정에 실패했습니다'
-    console.error('가족 배정 오류:', err)
-    throw new Error(errorMessage)
-  }
+  // assignUserToFamily는 inviteFamilyMember와 동일하게 동작
+  // 현재 RLS 제약으로 미가입 사용자 판별 불가능하므로
+  // 모든 경우 Magic Link 초대 방식으로 통일
+  return inviteFamilyMember({
+    familyId,
+    email,
+  })
 }
 
 /**

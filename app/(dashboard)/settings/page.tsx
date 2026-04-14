@@ -5,7 +5,15 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
-import { createFamily, inviteFamilyMember, updateFamily } from '@/lib/actions/family.actions'
+import {
+  createFamily,
+  inviteFamilyMember,
+  updateFamily,
+  removeFamilyMember,
+  cancelFamilyInvitation,
+  resendFamilyInvitation,
+  assignUserToFamily,
+} from '@/lib/actions/family.actions'
 import { inviteMemberSchema, familyUpdateSchema, type InviteMemberInput, type FamilyUpdateInput } from '@/schemas/album.schema'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -20,9 +28,11 @@ interface Family {
 
 interface FamilyMember {
   id: string
+  user_id: string | null
   email: string
   role: 'owner' | 'member'
-  joined_at: string | null
+  invited_at: string
+  joined_at?: string | null
 }
 
 export default function SettingsPage() {
@@ -100,11 +110,81 @@ export default function SettingsPage() {
       )
       reset()
       // 멤버 목록 새로고침
-      loadFamily()
+      await loadFamily()
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : '초대 발송에 실패했습니다.'
       toast.error(errorMessage)
     }
+  }
+
+  async function handleRemoveMember(memberId: string) {
+    if (!family) return
+
+    try {
+      await removeFamilyMember(family.id, memberId)
+      toast.success('멤버가 제거되었습니다.')
+      await loadFamily()
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : '멤버 제거에 실패했습니다.'
+      toast.error(errorMessage)
+    }
+  }
+
+  async function handleCancelInvitation(email: string) {
+    if (!family) return
+
+    try {
+      await cancelFamilyInvitation(family.id, email)
+      toast.success('초대가 취소되었습니다.')
+      await loadFamily()
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : '초대 취소에 실패했습니다.'
+      toast.error(errorMessage)
+    }
+  }
+
+  async function handleResendInvitation(email: string) {
+    if (!family) return
+
+    try {
+      await resendFamilyInvitation(family.id, email)
+      toast.success(`${email}로 초대 링크를 다시 보냈습니다.`)
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : '초대 재전송에 실패했습니다.'
+      toast.error(errorMessage)
+    }
+  }
+
+  async function handleAssignUserToFamily(email: string) {
+    if (!family) return
+
+    try {
+      const result = await assignUserToFamily(family.id, email)
+      if (result.method === 'direct') {
+        toast.success(`${email} 사용자가 가족에 추가되었습니다.`)
+      } else {
+        toast.success(`${email}로 초대 링크를 보냈습니다.`)
+      }
+      reset()
+      await loadFamily()
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : '사용자 추가에 실패했습니다.'
+      toast.error(errorMessage)
+    }
+  }
+
+  // 어드민 폼 (회원 가족 직접 할당)
+  const {
+    register: registerAdmin,
+    handleSubmit: handleSubmitAdmin,
+    reset: resetAdmin,
+    formState: { isSubmitting: isAdminSubmitting },
+  } = useForm<InviteMemberInput>({
+    resolver: zodResolver(inviteMemberSchema),
+  })
+
+  async function onAssignUser(data: InviteMemberInput) {
+    await handleAssignUserToFamily(data.email)
   }
 
   async function loadFamily() {
@@ -340,7 +420,7 @@ export default function SettingsPage() {
         ) : null}
       </section>
 
-      {/* 가족 멤버 */}
+      {/* 가족 멤버 - joined만 표시 */}
       <section className="rounded-xl bg-white border border-gray-100 p-5 shadow-sm space-y-4">
         <h2 className="font-semibold text-gray-900">가족 멤버</h2>
 
@@ -350,34 +430,86 @@ export default function SettingsPage() {
               <Skeleton key={i} className="h-10 w-full" />
             ))}
           </div>
-        ) : members.length > 0 ? (
-          <div className="space-y-2">
-            {members.map((member) => (
-              <div
-                key={member.id}
-                className="flex items-center justify-between rounded-lg bg-gray-50 p-3 text-sm"
-              >
-                <div>
-                  <p className="text-gray-900">{member.email}</p>
-                  <p className="text-xs text-gray-400">
-                    {member.role === 'owner' ? '소유자' : '멤버'}
-                    {member.joined_at && ` · ${new Date(member.joined_at).toLocaleDateString('ko-KR')}`}
-                  </p>
+        ) : (() => {
+          const joinedMembers = members.filter((m) => m.user_id !== null)
+          return joinedMembers.length > 0 ? (
+            <div className="space-y-2">
+              {joinedMembers.map((member) => (
+                <div
+                  key={member.id}
+                  className="flex items-center justify-between rounded-lg bg-gray-50 p-3 text-sm"
+                >
+                  <div className="flex-1">
+                    <p className="text-gray-900">{member.email}</p>
+                    <p className="text-xs text-gray-400">
+                      {member.role === 'owner' ? '소유자' : '멤버'}
+                      {member.joined_at && ` · ${new Date(member.joined_at).toLocaleDateString('ko-KR')}`}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {member.role === 'owner' && (
+                      <span className="text-xs bg-rose-50 text-rose-600 px-2 py-1 rounded-full">
+                        소유자
+                      </span>
+                    )}
+                    {member.role === 'member' && family?.owner_id && (
+                      <button
+                        onClick={() => handleRemoveMember(member.id)}
+                        className="text-xs text-red-500 hover:text-red-600 font-medium"
+                      >
+                        제거
+                      </button>
+                    )}
+                  </div>
                 </div>
-                {member.role === 'owner' && (
-                  <span className="text-xs bg-rose-50 text-rose-600 px-2 py-1 rounded-full">
-                    소유자
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-gray-500 text-center py-4">멤버가 없습니다</p>
-        )}
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500 text-center py-4">멤버가 없습니다</p>
+          )
+        })()}
       </section>
 
-      {/* 가족 초대 */}
+      {/* 초대 대기 중 (pending) */}
+      {(() => {
+        const pendingMembers = members.filter((m) => m.user_id === null)
+        return pendingMembers.length > 0 ? (
+          <section className="rounded-xl bg-white border border-gray-100 p-5 shadow-sm space-y-4">
+            <h2 className="font-semibold text-gray-900">초대 대기 중</h2>
+            <div className="space-y-2">
+              {pendingMembers.map((member) => (
+                <div
+                  key={member.id}
+                  className="flex items-center justify-between rounded-lg bg-yellow-50 border border-yellow-100 p-3 text-sm"
+                >
+                  <div>
+                    <p className="text-gray-900">{member.email}</p>
+                    <p className="text-xs text-gray-400">
+                      초대됨 · {new Date(member.invited_at).toLocaleDateString('ko-KR')}
+                    </p>
+                  </div>
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={() => handleResendInvitation(member.email)}
+                      className="text-xs text-blue-500 hover:text-blue-600 font-medium px-2 py-1 rounded hover:bg-blue-50"
+                    >
+                      재전송
+                    </button>
+                    <button
+                      onClick={() => handleCancelInvitation(member.email)}
+                      className="text-xs text-red-500 hover:text-red-600 font-medium px-2 py-1 rounded hover:bg-red-50"
+                    >
+                      취소
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null
+      })()}
+
+      {/* 가족 멤버 초대 */}
       <section className="rounded-xl bg-white border border-gray-100 p-5 shadow-sm space-y-4">
         <div>
           <h2 className="font-semibold text-gray-900">가족 멤버 초대</h2>
@@ -408,17 +540,48 @@ export default function SettingsPage() {
         </form>
       </section>
 
+      {/* 어드민: 회원 가족 직접 할당 */}
+      <section className="rounded-xl bg-white border border-gray-100 p-5 shadow-sm space-y-4">
+        <div>
+          <h2 className="font-semibold text-gray-900">회원 가족 배정</h2>
+          <p className="text-sm text-gray-500 mt-1">
+            이미 가입한 회원을 이 가족에 직접 추가합니다.
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmitAdmin(onAssignUser)} className="flex gap-2">
+          <div className="flex-1">
+            <input
+              {...registerAdmin('email')}
+              type="email"
+              placeholder="member@example.com"
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm placeholder-gray-400 focus:border-rose-300 focus:outline-none focus:ring-2 focus:ring-rose-100"
+            />
+          </div>
+          <Button
+            type="submit"
+            disabled={isAdminSubmitting}
+            className="bg-blue-500 hover:bg-blue-600 text-white shrink-0"
+          >
+            추가
+          </Button>
+        </form>
+      </section>
+
       {/* 계정 */}
       <section className="rounded-xl bg-white border border-gray-100 p-5 shadow-sm space-y-4">
         <h2 className="font-semibold text-gray-900">계정</h2>
-        <Button
-          variant="outline"
-          onClick={handleSignOut}
-          disabled={loading}
-          className="w-full border-red-200 text-red-500 hover:bg-red-50"
-        >
-          {loading ? '로그아웃 중...' : '로그아웃'}
-        </Button>
+
+        <div className="space-y-3">
+          <Button
+            variant="outline"
+            onClick={handleSignOut}
+            disabled={loading}
+            className="w-full border-red-200 text-red-500 hover:bg-red-50"
+          >
+            {loading ? '로그아웃 중...' : '로그아웃'}
+          </Button>
+        </div>
       </section>
     </div>
   )

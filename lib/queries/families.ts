@@ -149,7 +149,7 @@ export async function getFamilyWithMembers(familyId: string) {
   // 가족 멤버 조회
   const { data: members, error: membersError } = await supabase
     .from('family_members')
-    .select('id, email, role, joined_at')
+    .select('id, user_id, email, role, invited_at, joined_at')
     .eq('family_id', familyId)
     .order('joined_at', { ascending: true })
 

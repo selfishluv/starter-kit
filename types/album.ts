@@ -28,9 +28,9 @@ export interface Album {
 export interface FamilyMember {
   id: string
   family_id: string
-  user_id: string
+  user_id: string | null // pending 상태면 null (아직 가입하지 않음)
   email: string
   role: 'owner' | 'member'
   invited_at: string
-  joined_at?: string
+  joined_at?: string | null
 }

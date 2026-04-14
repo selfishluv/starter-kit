@@ -27,6 +27,9 @@ export async function GET(request: Request) {
           if (updateError) {
             console.error('family_members 업데이트 오류:', updateError)
           }
+
+          // 초대 경로에서는 비밀번호 설정 페이지로 리다이렉트
+          return NextResponse.redirect(`${origin}/auth/set-password?next=${next}`)
         }
       }
 

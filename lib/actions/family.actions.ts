@@ -118,10 +118,202 @@ export async function inviteFamilyMember(input: {
       console.error('초대 기록 저장 오류:', insertError)
     }
 
-    return { success: true, email: input.email }
+    return { success: true, email: input.email, method: 'invite' }
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : '초대 발송에 실패했습니다'
     console.error('초대 발송 오류:', err)
+    throw new Error(errorMessage)
+  }
+}
+
+/**
+ * 가족 멤버 제거
+ */
+export async function removeFamilyMember(familyId: string, memberId: string) {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    throw new Error('인증 필요')
+  }
+
+  try {
+    // 현재 사용자가 가족 owner인지 확인
+    const { data: family, error: familyError } = await supabase
+      .from('families')
+      .select('owner_id')
+      .eq('id', familyId)
+      .single()
+
+    if (familyError || !family || family.owner_id !== user.id) {
+      throw new Error('권한이 없습니다')
+    }
+
+    // 제거할 멤버 조회
+    const { data: member, error: memberError } = await supabase
+      .from('family_members')
+      .select('role')
+      .eq('id', memberId)
+      .eq('family_id', familyId)
+      .single()
+
+    if (memberError || !member) {
+      throw new Error('멤버를 찾을 수 없습니다')
+    }
+
+    // owner는 제거 불가
+    if (member.role === 'owner') {
+      throw new Error('소유자는 제거할 수 없습니다')
+    }
+
+    // 멤버 삭제
+    const { error: deleteError } = await supabase
+      .from('family_members')
+      .delete()
+      .eq('id', memberId)
+      .eq('family_id', familyId)
+
+    if (deleteError) {
+      console.error('멤버 제거 오류:', deleteError)
+      throw new Error('멤버 제거에 실패했습니다')
+    }
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : '멤버 제거에 실패했습니다'
+    console.error('멤버 제거 오류:', err)
+    throw new Error(errorMessage)
+  }
+}
+
+/**
+ * 초대 취소 (pending 상태의 초대 삭제)
+ */
+export async function cancelFamilyInvitation(familyId: string, email: string) {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    throw new Error('인증 필요')
+  }
+
+  try {
+    // 현재 사용자가 가족 owner인지 확인
+    const { data: family, error: familyError } = await supabase
+      .from('families')
+      .select('owner_id')
+      .eq('id', familyId)
+      .single()
+
+    if (familyError || !family || family.owner_id !== user.id) {
+      throw new Error('권한이 없습니다')
+    }
+
+    // pending 초대 삭제 (user_id IS NULL)
+    const { error: deleteError } = await supabase
+      .from('family_members')
+      .delete()
+      .eq('family_id', familyId)
+      .eq('email', email)
+      .is('user_id', null)
+
+    if (deleteError) {
+      console.error('초대 취소 오류:', deleteError)
+      throw new Error('초대 취소에 실패했습니다')
+    }
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : '초대 취소에 실패했습니다'
+    console.error('초대 취소 오류:', err)
+    throw new Error(errorMessage)
+  }
+}
+
+/**
+ * 초대 재전송 (Magic Link 재발송)
+ */
+export async function resendFamilyInvitation(familyId: string, email: string) {
+  // 기존 inviteFamilyMember 로직 재사용
+  return inviteFamilyMember({
+    familyId,
+    email,
+  })
+}
+
+/**
+ * 어드민: 회원에게 가족 직접 할당
+ * 이미 가입된 사용자면 Magic Link 없이 바로 추가
+ * 미가입 사용자면 Magic Link 초대 방식 사용
+ */
+export async function assignUserToFamily(familyId: string, email: string) {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    throw new Error('인증 필요')
+  }
+
+  try {
+    // 현재 사용자가 가족 owner인지 확인
+    const { data: family, error: familyError } = await supabase
+      .from('families')
+      .select('owner_id')
+      .eq('id', familyId)
+      .single()
+
+    if (familyError || !family || family.owner_id !== user.id) {
+      throw new Error('권한이 없습니다')
+    }
+
+    // 해당 이메일의 user_id 찾기 (어디 가족이든 상관없음)
+    const { data: existingMember } = await supabase
+      .from('family_members')
+      .select('user_id')
+      .eq('email', email)
+      .not('user_id', 'is', null)
+      .limit(1)
+      .single()
+
+    if (existingMember?.user_id) {
+      // 이미 가입된 사용자: upsert로 바로 추가
+      const { error: upsertError } = await supabase
+        .from('family_members')
+        .upsert(
+          [
+            {
+              family_id: familyId,
+              user_id: existingMember.user_id,
+              email,
+              role: 'member',
+            },
+          ],
+          { onConflict: 'family_id,user_id', ignoreDuplicates: true }
+        )
+
+      if (upsertError && upsertError.code !== '23505') {
+        throw upsertError
+      }
+
+      return { success: true, email, method: 'direct' }
+    } else {
+      // 미가입 사용자: Magic Link 초대 방식
+      return inviteFamilyMember({
+        familyId,
+        email,
+      })
+    }
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : '가족 배정에 실패했습니다'
+    console.error('가족 배정 오류:', err)
     throw new Error(errorMessage)
   }
 }

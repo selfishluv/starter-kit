@@ -60,7 +60,7 @@ export async function createFamily(input: { name?: string }) {
 }
 
 /**
- * Magic Link 초대 이메일 발송
+ * Magic Link 초대 이메일 발송 (owner만 가능)
  * 가족 멤버를 초대하고 이메일로 Magic Link 전송
  */
 export async function inviteFamilyMember(input: {
@@ -80,6 +80,19 @@ export async function inviteFamilyMember(input: {
   }
 
   try {
+    // 현재 사용자가 이 가족의 owner인지 확인
+    const { data: ownerCheck, error: ownerCheckError } = await supabase
+      .from('family_members')
+      .select('id, role')
+      .eq('family_id', input.familyId)
+      .eq('user_id', user.id)
+      .eq('role', 'owner')
+      .single()
+
+    if (ownerCheckError || !ownerCheck) {
+      throw new Error('멤버를 초대할 권한이 없습니다')
+    }
+
     // ✅ NEW: Magic Link URL에 familyId와 inviteEmail 파라미터 추가
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
     const emailRedirectTo = `${baseUrl}/auth/callback?next=/settings&familyId=${input.familyId}&inviteEmail=${encodeURIComponent(input.email)}`
@@ -129,7 +142,7 @@ export async function inviteFamilyMember(input: {
 }
 
 /**
- * 가족 멤버 제거
+ * 가족 멤버 제거 (owner만 가능)
  */
 export async function removeFamilyMember(familyId: string, memberId: string) {
   const supabase = await createClient()
@@ -144,16 +157,17 @@ export async function removeFamilyMember(familyId: string, memberId: string) {
   }
 
   try {
-    // 현재 사용자가 이 가족의 멤버인지 확인
+    // 현재 사용자가 이 가족의 owner인지 확인
     const { data: memberCheck, error: memberCheckError } = await supabase
       .from('family_members')
-      .select('id')
+      .select('id, role')
       .eq('family_id', familyId)
       .eq('user_id', user.id)
+      .eq('role', 'owner')
       .single()
 
     if (memberCheckError || !memberCheck) {
-      throw new Error('이 가족에 접근할 수 없습니다')
+      throw new Error('멤버를 제거할 권한이 없습니다')
     }
 
     // 제거할 멤버 조회
@@ -250,21 +264,6 @@ export async function resendFamilyInvitation(familyId: string, email: string) {
 }
 
 /**
- * 어드민: 회원에게 가족 직접 할당
- * 모든 사용자에게 Magic Link 초대 방식 사용
- * (RLS 제약으로 인해 auth.users 직접 조회 불가)
- */
-export async function assignUserToFamily(familyId: string, email: string) {
-  // assignUserToFamily는 inviteFamilyMember와 동일하게 동작
-  // 현재 RLS 제약으로 미가입 사용자 판별 불가능하므로
-  // 모든 경우 Magic Link 초대 방식으로 통일
-  return inviteFamilyMember({
-    familyId,
-    email,
-  })
-}
-
-/**
  * 기존 회원을 가족에 추가 (이메일 발송 없음)
  */
 export async function addExistingMemberToFamily(
@@ -281,6 +280,8 @@ export async function addExistingMemberToFamily(
   if (authError || !user) {
     throw new Error('인증 필요')
   }
+
+  console.log('addExistingMemberToFamily', user, '\nfamilyId : ', familyId, "\nemail : ",email)
 
   try {
     // 현재 사용자가 이 가족의 멤버인지 확인
@@ -336,7 +337,7 @@ export async function addExistingMemberToFamily(
 }
 
 /**
- * 가족 정보 수정
+ * 가족 정보 수정 (owner만 가능)
  */
 export async function updateFamily(input: {
   familyId: string
@@ -355,16 +356,17 @@ export async function updateFamily(input: {
   }
 
   try {
-    // 현재 사용자가 이 가족의 멤버인지 확인
+    // 현재 사용자가 이 가족의 owner인지 확인
     const { data: memberCheck, error: memberCheckError } = await supabase
       .from('family_members')
-      .select('id')
+      .select('id, role')
       .eq('family_id', input.familyId)
       .eq('user_id', user.id)
+      .eq('role', 'owner')
       .single()
 
     if (memberCheckError || !memberCheck) {
-      throw new Error('이 가족에 접근할 수 없습니다')
+      throw new Error('이 가족을 수정할 권한이 없습니다')
     }
 
     // 가족 정보 업데이트
@@ -388,6 +390,121 @@ export async function updateFamily(input: {
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : '가족 정보 수정에 실패했습니다'
     console.error('가족 정보 수정 오류:', err)
+    throw new Error(errorMessage)
+  }
+}
+
+/**
+ * 가족에서 탈퇴 (member만 가능)
+ */
+export async function leaveFamily(familyId: string) {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    throw new Error('인증 필요')
+  }
+
+  try {
+    // 현재 사용자의 가족 멤버십 확인
+    const { data: memberRecord, error: memberCheckError } = await supabase
+      .from('family_members')
+      .select('id, role')
+      .eq('family_id', familyId)
+      .eq('user_id', user.id)
+      .single()
+
+    if (memberCheckError || !memberRecord) {
+      throw new Error('이 가족에 속하지 않습니다')
+    }
+
+    // owner는 탈퇴 불가 (해산해야 함)
+    if (memberRecord.role === 'owner') {
+      throw new Error('소유자는 가족을 탈퇴할 수 없습니다. 가족을 해산해주세요.')
+    }
+
+    // member 삭제
+    const { error: deleteError } = await supabase
+      .from('family_members')
+      .delete()
+      .eq('id', memberRecord.id)
+
+    if (deleteError) {
+      console.error('가족 탈퇴 오류:', deleteError)
+      throw new Error('가족 탈퇴에 실패했습니다')
+    }
+
+    return { success: true, message: '가족에서 탈퇴했습니다' }
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : '가족 탈퇴에 실패했습니다'
+    console.error('가족 탈퇴 오류:', err)
+    throw new Error(errorMessage)
+  }
+}
+
+/**
+ * 가족 해산 (owner만 가능)
+ * 모든 멤버를 삭제하고 가족을 완전히 삭제
+ */
+export async function dissolveFamily(familyId: string) {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    throw new Error('인증 필요')
+  }
+
+  try {
+    // 현재 사용자가 이 가족의 owner인지 확인
+    const { data: ownerCheck, error: ownerCheckError } = await supabase
+      .from('family_members')
+      .select('id, role')
+      .eq('family_id', familyId)
+      .eq('user_id', user.id)
+      .eq('role', 'owner')
+      .single()
+
+    if (ownerCheckError || !ownerCheck) {
+      throw new Error('가족을 해산할 권한이 없습니다')
+    }
+
+    // 1단계: 가족의 모든 앨범 삭제 (선택적 - 앨범 테이블이 있다면)
+    // 현재 앨범 삭제는 RLS나 별도 처리 필요
+
+    // 2단계: 가족의 모든 멤버 삭제
+    const { error: membersDeleteError } = await supabase
+      .from('family_members')
+      .delete()
+      .eq('family_id', familyId)
+
+    if (membersDeleteError) {
+      console.error('가족 멤버 삭제 오류:', membersDeleteError)
+      throw new Error('가족 해산에 실패했습니다')
+    }
+
+    // 3단계: 가족 삭제
+    const { error: familyDeleteError } = await supabase
+      .from('families')
+      .delete()
+      .eq('id', familyId)
+
+    if (familyDeleteError) {
+      console.error('가족 삭제 오류:', familyDeleteError)
+      throw new Error('가족 해산에 실패했습니다')
+    }
+
+    return { success: true, message: '가족이 해산되었습니다' }
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : '가족 해산에 실패했습니다'
+    console.error('가족 해산 오류:', err)
     throw new Error(errorMessage)
   }
 }

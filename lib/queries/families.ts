@@ -1,8 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 
 /**
- * 현재 사용자의 가족 ID 조회
- * 소유한 가족이 없으면 null 반환 (자동 생성하지 않음)
+ * 현재 사용자의 첫 번째 가족 ID 조회 (소유 또는 멤버)
+ * 소유한 가족이 있으면 우선, 없으면 멤버로 속한 가족 반환
+ * 모두 없으면 null 반환
  */
 export async function getUserFamilyId(): Promise<string | null> {
   const supabase = await createClient()
@@ -16,19 +17,21 @@ export async function getUserFamilyId(): Promise<string | null> {
     throw new Error('인증 필요')
   }
 
-  // 기존 가족 조회
-  const { data: families, error: queryError } = await supabase
+  // 1순위: 소유한 가족 조회
+  const { data: ownerFamily } = await supabase
     .from('families')
     .select('id')
     .eq('owner_id', user.id)
+    .order('created_at', { ascending: true })
+    .limit(1)
     .single()
 
-  if (families && families.id) {
-    // 기존 가족이 있으면 family_members에 upsert (없을 경우만 삽입)
+  if (ownerFamily?.id) {
+    // 소유한 가족이 있으면 family_members에 upsert (없을 경우만 삽입)
     const { error: memberError } = await supabase
       .from('family_members')
       .upsert(
-        [{ family_id: families.id, user_id: user.id, email: user.email, role: 'owner' }],
+        [{ family_id: ownerFamily.id, user_id: user.id, email: user.email, role: 'owner' }],
         { onConflict: 'family_id,user_id', ignoreDuplicates: true }
       )
 
@@ -37,15 +40,24 @@ export async function getUserFamilyId(): Promise<string | null> {
       // 멤버 추가 실패해도 family ID는 반환
     }
 
-    return families.id
+    return ownerFamily.id
   }
 
-  // ✅ 변경: 가족이 없으면 null 반환 (자동 생성하지 않음)
-  if (queryError && queryError.code === 'PGRST116') {
-    return null
+  // 2순위: 멤버로 속한 가족 조회
+  const { data: memberFamily } = await supabase
+    .from('family_members')
+    .select('family_id')
+    .eq('user_id', user.id)
+    .order('joined_at', { ascending: true })
+    .limit(1)
+    .single()
+
+  if (memberFamily?.family_id) {
+    return memberFamily.family_id
   }
 
-  throw new Error('가족 ID를 찾을 수 없습니다')
+  // 가족이 없으면 null 반환
+  return null
 }
 
 /**
@@ -75,6 +87,42 @@ export async function getUserFamilies() {
   }
 
   return families || []
+}
+
+/**
+ * 사용자가 속한 모든 가족 목록 조회 (소유 + 멤버)
+ */
+export async function getUserAllFamilies() {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    throw new Error('인증 필요')
+  }
+
+  // family_members 테이블에서 사용자가 속한 모든 가족 조회
+  const { data: familyMembers, error } = await supabase
+    .from('family_members')
+    .select('family_id, role, families:family_id(id, name, owner_id, created_at, updated_at)')
+    .eq('user_id', user.id)
+    .order('joined_at', { ascending: false })
+
+  if (error) {
+    console.error('가족 목록 조회 오류:', error)
+    throw new Error('가족 목록을 불러올 수 없습니다')
+  }
+
+  // 가족 정보 추출 및 role 정보 포함
+  const familiesWithRole = familyMembers?.map((member) => ({
+    ...member.families,
+    role: member.role,
+  })) || []
+
+  return familiesWithRole
 }
 
 /**

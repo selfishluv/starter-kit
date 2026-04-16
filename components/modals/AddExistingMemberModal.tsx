@@ -3,6 +3,14 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { addExistingMemberToFamily } from '@/lib/actions/family.actions'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 
 interface AddExistingMemberModalProps {
@@ -40,7 +48,6 @@ export function AddExistingMemberModal({
     setIsSearching(true)
     setHasSearched(true)
     try {
-      // Server Action으로 검색 처리
       const response = await fetch('/api/search-members', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -75,11 +82,7 @@ export function AddExistingMemberModal({
     try {
       await addExistingMemberToFamily(familyId, selectedEmail)
       toast.success(`${selectedEmail} 회원이 추가되었습니다`)
-      setEmail('')
-      setSearchResults([])
-      setSelectedEmail(null)
-      setHasSearched(false)
-      onClose()
+      handleClose()
       onSuccess()
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : '회원 추가에 실패했습니다'
@@ -97,18 +100,17 @@ export function AddExistingMemberModal({
     onClose()
   }
 
-  if (!isOpen) return null
-
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
-      <div className="bg-white rounded-xl max-w-md w-full shadow-lg">
-        {/* 헤더 */}
-        <div className="px-6 py-4 border-b border-gray-100">
-          <h2 className="text-lg font-semibold text-gray-900">기존 회원 추가</h2>
-        </div>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>기존 회원 추가</DialogTitle>
+          <DialogDescription>
+            이미 가입한 회원을 검색하여 가족에 추가합니다.
+          </DialogDescription>
+        </DialogHeader>
 
-        {/* 본문 */}
-        <div className="p-6 space-y-4">
+        <div className="space-y-4 py-4">
           {/* 검색 입력 */}
           <div className="flex gap-2">
             <input
@@ -168,24 +170,22 @@ export function AddExistingMemberModal({
           )}
         </div>
 
-        {/* 버튼 */}
-        <div className="px-6 py-4 border-t border-gray-100 flex gap-2">
+        <DialogFooter>
           <Button
             onClick={handleClose}
             variant="outline"
-            className="flex-1"
           >
             취소
           </Button>
           <Button
             onClick={handleAdd}
             disabled={!selectedEmail || isAdding}
-            className="flex-1 bg-blue-500 hover:bg-blue-600 text-white"
+            className="bg-blue-500 hover:bg-blue-600 text-white"
           >
             {isAdding ? '추가 중...' : '추가'}
           </Button>
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

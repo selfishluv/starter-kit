@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/selfi/workspace/claude-code-mastery/**)",
+      "Bash(xargs ls:*)",
+      "Bash(npx create-next-app@latest:*)",
+      "Bash(npm install:*)",
+      "Bash(npx shadcn-ui@latest:*)",
+      "Bash(npx shadcn@latest:*)",
+      "Bash(npm run:*)",
+      "Bash(git add:*)",
+      "Bash(npx eslint:*)",
+      "Read(//tmp/**)",
+      "Bash(ls /Users/selfi/workspace/claude-code-mastery/starter-kit/app/api/family/[id]/)"
+    ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/notify-slack.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

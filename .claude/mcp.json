@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "sequential-thinking": {
+      "command": "npx",
+      "args": ["@modelcontextprotocol/server-sequential-thinking"]
+    },
+    "context7": {
+      "command": "npx",
+      "args": ["@modelcontextprotocol/server-context7"]
+    },
+    "shadcn": {
+      "command": "npx",
+      "args": ["@modelcontextprotocol/server-shadcn"]
+    }
+  }
+}
